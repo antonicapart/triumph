@@ -79,4 +79,15 @@ public class ModelTest {
         Assert.assertNull(model.get(column));
     }
 
+    @Test
+    public void testGetAPrimitifValue() {
+        final String column = "primitifColumnExample";
+        final int value = 1;
+
+        final ModelExample model = new ModelExample();
+        model.set(column, value);
+
+        Assert.assertEquals(model.get(column), value);
+    }
+
 }

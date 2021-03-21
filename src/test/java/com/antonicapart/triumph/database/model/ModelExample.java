@@ -4,6 +4,8 @@ public class ModelExample extends Model {
 
     private Long columnExample;
 
+    private int primitifColumnExample;
+
     public Long getColumnExample() {
         return columnExample;
     }
