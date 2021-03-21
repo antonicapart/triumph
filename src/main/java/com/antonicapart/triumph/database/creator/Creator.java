@@ -4,15 +4,13 @@ import com.antonicapart.triumph.database.model.Model;
 import com.antonicapart.triumph.database.model.annotations.Table;
 import com.antonicapart.triumph.errors.creator.ModelNotExtendsError;
 import com.antonicapart.triumph.database.creator.types.TableTypes;
+import com.antonicapart.triumph.support.Str;
 import org.reflections.Reflections;
 import org.reflections.scanners.SubTypesScanner;
 import org.reflections.scanners.TypeAnnotationsScanner;
 
 import java.lang.reflect.InvocationTargetException;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class Creator {
@@ -44,6 +42,22 @@ public class Creator {
             mapTable.put((Class<? extends Model>) aClass, tableName.equals("") ? aClass.getSimpleName() : tableName);
         });
 
+        TreeMap<Class<? extends Model>, String> buildingTree = new TreeMap<>();
+
+        mapTable.forEach((k, v) -> {
+            try {
+                int h = 0;
+                Class<? extends Model> parent = null;
+                Model m = constructClass(k);
+                m.getRelations().forEach((k2, v2) -> {
+                    if (buildingTree.containsKey(k2));
+                       // TODO Build, construction tree
+                });
+            } catch (IllegalAccessException | InvocationTargetException | InstantiationException e) {
+                e.printStackTrace();
+            }
+        });
+
         mapTable.forEach((k,v) -> System.out.println(createTable(k,v)));
         return null;
     }
@@ -52,7 +66,7 @@ public class Creator {
         StringBuilder out = new StringBuilder();
         out.append(TableTypes.DELETE_TABLE.getValue()).append(" ")
                 .append(TableTypes.IF_EXIST.getValue()).append(" ")
-                .append(tableName);
+                .append(tableName).append(";");
 
         out.append("\n");
 
@@ -60,18 +74,22 @@ public class Creator {
                 .append(tableName).append(" (");
 
         try {
-            Model model = (Model) Arrays.stream(aClass.getDeclaredConstructors()).filter(constructor -> constructor.getParameterCount() == 0).findFirst().get().newInstance();
+            Model model = constructClass(aClass);
 
             out.append("\n\t").append(model.getFields2().entrySet().stream().map((entry) -> {
-                return entry.getKey() + " " + entry.getValue().getKey() + (entry.getValue().getKey().asArg() ? " (" + entry.getValue().getValue() + ")" : "");
+                return Str.toSnake(entry.getKey()) + " " + entry.getValue().getKey() + (entry.getValue().getKey().asArg() ? " (" + entry.getValue().getValue() + ")" : "" + (model.getNullableFields().containsKey(entry.getKey()) ? " " + (model.getNullableFields().get(entry.getKey()) ? TableTypes.NULL.getValue() : TableTypes.NOT_NULL.getValue()) : ""));
             }).collect(Collectors.joining(",\n\t")));
 
-            out.append(",\n\t").append(TableTypes.PRIMARY_KEY).append("(").append(String.join(", ", model.getKeys())).append(")");
+            out.append(",\n\t").append(TableTypes.PRIMARY_KEY.getValue()).append("(").append(String.join(", ", model.getKeys())).append(")");
         } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
             e.printStackTrace();
         }
 
         out.append(" \n);");
         return out.toString();
+    }
+
+    private Model constructClass(Class<? extends Model> aClass) throws IllegalAccessException, InvocationTargetException, InstantiationException {
+        return (Model) Arrays.stream(aClass.getDeclaredConstructors()).filter(constructor -> constructor.getParameterCount() == 0).findFirst().get().newInstance();
     }
 }

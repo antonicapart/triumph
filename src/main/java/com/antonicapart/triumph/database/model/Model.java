@@ -3,28 +3,35 @@ package com.antonicapart.triumph.database.model;
 import com.antonicapart.triumph.database.creator.types.TypeTypes;
 import com.antonicapart.triumph.database.model.annotations.Column;
 import com.antonicapart.triumph.database.model.annotations.Key;
+import com.antonicapart.triumph.database.model.annotations.Nullable;
 import com.antonicapart.triumph.database.model.annotations.Relation;
 import com.antonicapart.triumph.errors.creator.AttributeNeededError;
+import com.antonicapart.triumph.errors.creator.RelationFieldsNotExist;
+import com.antonicapart.triumph.errors.creator.RelationFieldsNotMatching;
 import com.antonicapart.triumph.errors.creator.TypeNotMatchingError;
 
 import java.io.Serializable;
 import java.lang.reflect.Field;
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.*;
 import java.util.AbstractMap.SimpleEntry;
+import java.util.stream.Collectors;
 
 public abstract class Model implements Serializable
 {
     private final Set<String> keys;
     private final Map<String, SimpleEntry<Type, Object>> fields;
     private final Map<String, SimpleEntry<TypeTypes, String>> fields2;
-    private final Map<String, Class<? extends Model>> relations;
+    private final Map<String, Boolean> nullableFields;
+    private final Map<String, SimpleEntry<Class<? extends Model>, String>> relations;
 
     public Model ()
     {
         this.keys = new LinkedHashSet<>();
         this.fields = new LinkedHashMap<>();
         this.fields2 = new LinkedHashMap<>();
+        this.nullableFields = new LinkedHashMap<>();
 
         this.relations = new LinkedHashMap<>();
 
@@ -34,6 +41,11 @@ public abstract class Model implements Serializable
         for (Field attribute : attributes) {
             if (attribute.isAnnotationPresent(Key.class)) {
                 this.keys.add(attribute.getName());
+                this.nullableFields.put(attribute.getName(), false);
+            }
+
+            if (attribute.isAnnotationPresent(Nullable.class)) {
+                this.nullableFields.put(attribute.getName(), attribute.getAnnotation(Nullable.class).isNullable());
             }
 
             if (attribute.isAnnotationPresent(Column.class)) {
@@ -41,21 +53,51 @@ public abstract class Model implements Serializable
 
                 Column column = attribute.getAnnotation(Column.class);
 
-                TypeTypes typeTypes = TypeTypes.getTypeFromType(attribute.getType());
+                TypeTypes currentType = column.type();
+                if (currentType.equals(TypeTypes.NOT_DEFINE)) {
+                    currentType = TypeTypes.getTypeFromType(attribute.getType());
 
-                if (typeTypes.equals(TypeTypes.NOT_DEFINE))
-                    throw new TypeNotMatchingError(attribute, attribute.getType(), null);
+                    if (currentType.equals(TypeTypes.NOT_DEFINE))
+                        throw new TypeNotMatchingError(attribute, attribute.getType(), currentType);
+                }
+                else {
+                    if (!currentType.equals(TypeTypes.getTypeFromType(attribute.getType())))
+                        throw new TypeNotMatchingError(attribute, attribute.getType(), currentType);
 
-                if (column.type().asArg() && column.args().isEmpty())
-                    throw new AttributeNeededError(attribute, column.type());
+                }
 
-                System.out.println(column.type() + " / " + column.type().asArg() + " : " + column.args());
+                if (currentType.asArg() && column.args().isEmpty())
+                    throw new AttributeNeededError(attribute, currentType);
 
-                this.fields2.put(attribute.getName(), new SimpleEntry<>(typeTypes, typeTypes.asArg() ? column.args() : null));
+                this.fields2.put(attribute.getName(), new SimpleEntry<>(currentType, currentType.asArg() ? column.args() : null));
             }
 
             if (attribute.isAnnotationPresent(Relation.class)) {
-                this.relations.put(attribute.getName(), attribute.getAnnotation(Relation.class).model());
+                Relation relation =  attribute.getAnnotation(Relation.class);
+                Class<? extends Model> relatedClass = relation.model();
+                String relatedField = relation.relatedField();
+
+                if (relatedField.isEmpty()) {
+                    for (Field declaredField : relatedClass.getDeclaredFields()) {
+                        if (declaredField.getName().contains(attribute.getDeclaringClass().getSimpleName()))
+                            relatedField = declaredField.getName();
+                    }
+                    if (relatedField.isEmpty()) {
+                        throw new RelationFieldsNotExist(attribute, relatedClass);
+                    }
+                }
+
+                if (Arrays.stream(relatedClass.getDeclaredFields()).map(Field::getName).collect(Collectors.toList()).contains(relatedField)){
+                    try {
+                        if (!(Arrays.stream(((ParameterizedType) relatedClass.getDeclaredField(relatedField).getGenericType()).getActualTypeArguments()).findFirst().get()).equals(attribute.getDeclaringClass()))
+                            throw new RelationFieldsNotMatching(attribute, relatedClass, relatedField);
+                    } catch (NoSuchFieldException e) {
+                        e.printStackTrace();
+                    }
+                }
+                else throw new RelationFieldsNotExist(attribute, relatedClass);
+
+                this.relations.put(attribute.getName(), new SimpleEntry<>(relatedClass, relatedField));
             }
         }
     }
@@ -107,7 +149,11 @@ public abstract class Model implements Serializable
         return fields2;
     }
 
-    public Map<String, Class<? extends Model>> getRelations() {
+    public Map<String, Boolean> getNullableFields() {
+        return nullableFields;
+    }
+
+    public Map<String, SimpleEntry<Class<? extends Model>, String>> getRelations() {
         return relations;
     }
 

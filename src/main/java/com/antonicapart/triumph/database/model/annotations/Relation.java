@@ -13,5 +13,5 @@ import static java.lang.annotation.ElementType.FIELD;
 public @interface Relation {
     
     Class<? extends Model> model();
-
+    String relatedField() default "";
 }

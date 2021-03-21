@@ -5,7 +5,9 @@ public enum TableTypes {
     ON_CASCADE("CASCADE"),
     DELETE_TABLE("DROP TABLE"),
     CREATE_TABLE("CREATE TABLE"),
-    PRIMARY_KEY("PRIMARY KEY");
+    PRIMARY_KEY("PRIMARY KEY"),
+    NULL("NULL"),
+    NOT_NULL("NOT NULL");
 
     private String value;
 

@@ -7,6 +7,6 @@ import java.lang.reflect.Field;
 
 public class AttributeNeededError  extends TriumphError {
     public AttributeNeededError(Field field, TypeTypes typeTypes) {
-        super("The field " + field.getName() + " need one args because of type : " + typeTypes.name());
+        super("The field " + field.getName() + " of class : " + field.getDeclaringClass().getName() + " need one args because of type : " + typeTypes.name());
     }
 }

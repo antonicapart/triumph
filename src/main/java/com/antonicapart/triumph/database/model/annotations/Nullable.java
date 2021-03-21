@@ -2,12 +2,8 @@ package com.antonicapart.triumph.database.model.annotations;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-
-import static java.lang.annotation.ElementType.FIELD;
 
 @Retention(RetentionPolicy.RUNTIME)
-@Nullable(isNullable = false)
-@Target(FIELD)
-public @interface Key {
+public @interface Nullable {
+    boolean isNullable() default true;
 }
